@@ -359,6 +359,10 @@ const [formData, setFormData] = useState({
     <strong>Faisal Saleh Alotaibi</strong>
     <p>Student ID: 221211338</p>
   </div>
+  <div className="team-member">
+    <strong>Faisal Alshathry</strong>
+    <p>Student ID: 222111402</p>
+  </div>
 </div>
               
             </div>

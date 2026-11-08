@@ -92,4 +92,4 @@ The production build was tested using Vite.
 **Result:** `npm run build` completed successfully, generating the production files in the `dist` directory.
 
 ### Conclusion
-The application passed all three automated tests, the lint check, and the production build. These checks provide initial confidence in the application's rendering, navigation, and form-opening behavior. Further testing is recommended for adding, editing, deleting, and searching computer assets, as well as validating form inputs.
+The application passed all three automated tests, the lint check, and the production build. These checks provide initial confidence in the application's rendering, navigation, and form-opening behavior. Further testing is recommended for adding, editing, deleting, and searching computer assets, as well as validating form inputs.gi
