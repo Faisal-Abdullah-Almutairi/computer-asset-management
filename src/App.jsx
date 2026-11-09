@@ -1,41 +1,75 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
-const initialAssets = [
-  {
-    id: 1,
-    assetTag: 'PC-001',
-    brand: 'Dell',
-    model: 'Latitude 5440',
-    assignedTo: 'Ahmed Ali',
-    status: 'Assigned',
-  },
-  {
-    id: 2,
-    assetTag: 'PC-002',
-    brand: 'HP',
-    model: 'EliteBook 840',
-    assignedTo: 'Sara Mohammed',
-    status: 'Available',
-  },
-  {
-    id: 3,
-    assetTag: 'PC-003',
-    brand: 'Lenovo',
-    model: 'ThinkPad E14',
-    assignedTo: 'Omar Khalid',
-    status: 'Maintenance',
-  },
-]
+
 
 function App() {
-  const [assets, setAssets] = useState(initialAssets)
+  const [assets, setAssets] = useState([])
+
+  const [currentPage, setCurrentPage] = useState(0)
+  const [pageSize] = useState(5)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
+  const [dashboardAssets, setDashboardAssets] = useState([])
+  
+
+useEffect(() => {
+  async function loadAssets() {
+    try {
+      const response = await fetch(
+        `/api/assets?page=${currentPage}&size=${pageSize}`
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to load assets')
+      }
+
+      const data = await response.json()
+
+      setAssets(data.content)
+      setTotalPages(data.totalPages)
+      setTotalElements(data.totalElements)
+    } catch (error) {
+      console.error('Error loading assets:', error)
+    }
+  }
+
+  loadAssets()
+}, [currentPage, pageSize])
+
+
+useEffect(() => {
+  async function loadDashboardAssets() {
+    try {
+      const response = await fetch('/api/assets?page=0&size=1000')
+
+      if (!response.ok) {
+        throw new Error('Failed to load dashboard assets')
+      }
+
+      const data = await response.json()
+      setDashboardAssets(data.content)
+    } catch (error) {
+      console.error('Dashboard loading error:', error)
+    }
+  }
+
+  loadDashboardAssets()
+}, [assets])
+
+
+
+
+
+
+
 const [searchTerm, setSearchTerm] = useState('')
+const [searchedAsset, setSearchedAsset] = useState(null)
 const [showForm, setShowForm] = useState(false)
 const [editingId, setEditingId] = useState(null)
 const [formData, setFormData] = useState({
-  assetTag: '',
+
   brand: '',
   model: '',
   assignedTo: '',
@@ -49,28 +83,75 @@ const [formData, setFormData] = useState({
     'About',
   ]
 
-  const filteredAssets = assets.filter((asset) =>
-  [
-    asset.assetTag,
-    asset.brand,
-    asset.model,
-    asset.assignedTo,
-    asset.status,
-  ]
-    .join(' ')
-    .toLowerCase()
-    .includes(searchTerm.toLowerCase())
-)
-  const totalAssets = assets.length
-  const assignedAssets = assets.filter(
-    (asset) => asset.status === 'Assigned',
-  ).length
-  const availableAssets = assets.filter(
-    (asset) => asset.status === 'Available',
-  ).length
-  const maintenanceAssets = assets.filter(
-    (asset) => asset.status === 'Maintenance',
-  ).length
+  
+const filteredAssets = searchTerm.trim() && /^[1-9]\d*$/.test(searchTerm.trim())
+  ? searchedAsset && String(searchedAsset.id) === searchTerm.trim()
+    ? [searchedAsset]
+    : []
+  : assets.filter((asset) =>
+      [
+        asset.id,
+        asset.brand,
+        asset.model,
+        asset.assignedTo,
+        asset.status,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    )
+
+  const totalAssets = totalElements
+  
+const assignedAssets = dashboardAssets.filter(
+  (asset) => asset.status === 'Assigned'
+).length
+
+const availableAssets = dashboardAssets.filter(
+  (asset) => asset.status === 'Available'
+).length
+
+const maintenanceAssets = dashboardAssets.filter(
+  (asset) => asset.status === 'Maintenance'
+).length
+
+
+  
+async function handleSearch(value) {
+  setSearchTerm(value)
+
+  const query = value.trim()
+
+  if (!query) {
+    setSearchedAsset(null)
+    return
+  }
+
+  
+  if (/^[1-9]\d*$/.test(query)) {
+    try {
+      const response = await fetch(`/api/assets/${query}`)
+
+      if (response.status === 404) {
+        setSearchedAsset(null)
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to search for asset')
+      }
+
+      const asset = await response.json()
+      setSearchedAsset(asset)
+    } catch (error) {
+      console.error('Search error:', error)
+      setSearchedAsset(null)
+    }
+  } else {
+    setSearchedAsset(null)
+  }
+}
+
 
   return (
     <div className="app">
@@ -209,46 +290,72 @@ const [formData, setFormData] = useState({
 {showForm && (
   <form
     className="asset-form"
-    onSubmit={(event) => {
-      event.preventDefault()
-      if (editingId !== null) {
-  setAssets((currentAssets) =>
-    currentAssets.map((asset) =>
-      asset.id === editingId
-        ? { ...formData, id: editingId }
-        : asset
-    )
-  )
-} else {
-  const newAsset = {
-    ...formData,
-    id: Date.now(),
+    
+onSubmit={async (event) => {
+  event.preventDefault()
+
+  try {
+    
+if (editingId !== null) {
+  const response = await fetch(`/api/assets/${editingId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to update computer')
   }
 
-  setAssets((currentAssets) => [...currentAssets, newAsset])
+  const updatedAsset = await response.json()
+
+  setAssets((currentAssets) =>
+    currentAssets.map((asset) =>
+      asset.id === editingId ? updatedAsset : asset
+    )
+  )
 }
-      setFormData({
-        assetTag: '',
-        brand: '',
-        model: '',
-        assignedTo: '',
-        status: 'Available',
+ else {
+      const response = await fetch('/api/assets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       })
-      setShowForm(false)
-      setEditingId(null)
-    }}
+
+      if (!response.ok) {
+        throw new Error('Failed to add computer')
+      }
+
+      const savedAsset = await response.json()
+
+      setAssets((currentAssets) => [...currentAssets, savedAsset])
+    }
+
+    setFormData({
+      assetTag: '',
+      brand: '',
+      model: '',
+      assignedTo: '',
+      status: 'Available',
+    })
+
+    setShowForm(false)
+    setEditingId(null)
+  } catch (error) {
+    console.error('Error saving computer:', error)
+    alert('Failed to save computer. Please try again.')
+  }
+}}
+
   >
     <h3>{editingId !== null ? 'Edit Computer' : 'Add New Computer'}</h3>
 
     <div className="form-grid">
-      <input
-        required
-        placeholder="Asset Tag (e.g. PC-004)"
-        value={formData.assetTag}
-        onChange={(event) =>
-          setFormData({ ...formData, assetTag: event.target.value })
-        }
-      />
+      
 
       <input
         required
@@ -307,16 +414,21 @@ const [formData, setFormData] = useState({
         <input
           type="text"
           className="search-input"
-          placeholder="Search by tag, brand, model, employee, or status..."
+          placeholder="Search by ID, brand, model, employee, or status..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) => handleSearch(event.target.value)}
         />
         <span className="asset-count">
           {filteredAssets.length} assets
         </span>
       </div>
 
-      <AssetTable
+      
+
+
+
+      
+<AssetTable
   assets={filteredAssets}
   setAssets={setAssets}
   setEditingId={setEditingId}
@@ -324,9 +436,42 @@ const [formData, setFormData] = useState({
   setShowForm={setShowForm}
   setActivePage={setActivePage}
 />
+{!searchTerm.trim() && (
+<div
+  style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '16px',
+    marginTop: '24px',
+  }}
+>
+  <button
+    type="button"
+    disabled={currentPage === 0}
+    onClick={() => setCurrentPage(currentPage - 1)}
+  >
+    Previous
+  </button>
+
+  <span>
+    Page {currentPage + 1} of {Math.max(totalPages, 1)}
+  </span>
+
+  <button
+    type="button"
+    disabled={currentPage >= totalPages - 1}
+    onClick={() => setCurrentPage(currentPage + 1)}
+  >
+    Next
+  </button>
+</div>
+)}
+
     </div>
   </section>
 )}
+
 
 
         {activePage === 'About' && (
@@ -397,7 +542,7 @@ function AssetTable({
         <thead>
           
           <tr>
-          <th>Asset Tag</th>
+          <th>ID</th>
         <th>Computer</th>
         <th>Assigned To</th>
           <th>Status</th>
@@ -408,7 +553,7 @@ function AssetTable({
         <tbody>
           {assets.map((asset) => (
             <tr key={asset.id}>
-              <td><strong>{asset.assetTag}</strong></td>
+              <td><strong>{asset.id}</strong></td>
               <td>
                 <div className="computer-cell">
                   <div className="computer-icon">▣</div>
@@ -436,12 +581,11 @@ function AssetTable({
   onClick={() => {
     setEditingId(asset.id)
     setFormData({
-      assetTag: asset.assetTag,
-      brand: asset.brand,
-      model: asset.model,
-      assignedTo: asset.assignedTo,
-      status: asset.status,
-    })
+  brand: asset.brand,
+  model: asset.model,
+  assignedTo: asset.assignedTo,
+  status: asset.status,
+})
     setShowForm(true)
     setActivePage('All Assets')
   }}
@@ -451,13 +595,28 @@ function AssetTable({
   <button
   className="delete-button"
   type="button"
-  onClick={() => {
-    if (window.confirm(`Delete computer ${asset.assetTag}?`)) {
+  
+onClick={async () => {
+  if (window.confirm('Are you sure you want to delete this computer?')) {
+    try {
+      const response = await fetch(`/api/assets/${asset.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete computer')
+      }
+
       setAssets((currentAssets) =>
         currentAssets.filter((item) => item.id !== asset.id)
       )
+    } catch (error) {
+      console.error('Error deleting computer:', error)
+      alert('Failed to delete computer. Please try again.')
     }
-  }}
+  }
+}}
+
 >
   Delete
 </button>
